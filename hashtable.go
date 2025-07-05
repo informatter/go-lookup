@@ -6,7 +6,7 @@ import (
 	"math"
 
 	// "fmt"
-	"hash/fnv"
+//	"hash/fnv"
 )
 
 const risizeUpThreshold float32 = 0.60
@@ -71,12 +71,14 @@ func pickSmallestLength(length uint64) uint64 {
 	panic("The provided length is not supported!")
 }
 
+const fnvPrime uint64 = 1099511628211
+
 type HashTable struct {
 	length              uint64
 	slots               []data
 	activeSlotCounter   uint64
 	occupiedSlotCounter uint64
-	collistionCount     uint64
+	debugCollistionCount     uint64
 }
 
 func New(length uint64) *HashTable {
@@ -87,16 +89,26 @@ func New(length uint64) *HashTable {
 		slots:               make([]data, primeLength),
 		activeSlotCounter:   0,
 		occupiedSlotCounter: 0,
-		collistionCount:     0,
+		debugCollistionCount:     0,
 	}
 }
 
-func (h *HashTable) fnvHash(key string) uint64 {
 
-	hash := fnv.New64a()
-	hash.Write([]byte(key))
-	return hash.Sum64()
+func (h *HashTable) fnvHash(key string) uint64 {
+	var hash uint64 = 14695981039346656037
+	for _, char := range key{
+		hash ^=uint64(char)
+		hash*=fnvPrime
+	}		
+	return hash	
 }
+
+// func (h *HashTable) fnvHash(key string) uint64 {
+
+// 	hash := fnv.New64a()
+// 	hash.Write([]byte(key))
+// 	return hash.Sum64()
+// }
 
 func (h *HashTable) hash(key string, collisionCount uint64) uint64 {
 	hashKey := h.fnvHash(key)
@@ -162,7 +174,7 @@ func (h *HashTable) insert(slots []data, key string, value any) {
 	// Start Probing
 	for {
 		collisionCount++
-		h.collistionCount++
+		h.debugCollistionCount++
 		deltaLocation := h.hash(key, collisionCount)
 
 		if deltaLocation == homeLocation {
