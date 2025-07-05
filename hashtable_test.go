@@ -89,12 +89,13 @@ func TestResizeDown(t *testing.T) {
 		t.Errorf("HashTable length = %d, but expected: %d", hashTable.length, expectedLength)
 	}
 
-	expectedTotalItems := 3
-	if hashTable.activeSlotCounter != uint64(expectedTotalItems) {
-		t.Errorf("HashTable activeSlotCounter =  %d, but expected: %d", hashTable.activeSlotCounter, expectedTotalItems)
+	expectedActiveSlotCounter := 2
+	expectedOccupiedSlotCounter :=2
+	if hashTable.activeSlotCounter != uint64(expectedActiveSlotCounter) {
+		t.Errorf("HashTable activeSlotCounter =  %d, but expected: %d", hashTable.activeSlotCounter, expectedActiveSlotCounter)
 	}
-	if hashTable.occupiedSlotCounter != 3 {
-		t.Errorf("HashTable occupiedSlotCounter =  %d, but expected: %d", hashTable.occupiedSlotCounter, 3)
+	if hashTable.occupiedSlotCounter != 2 {
+		t.Errorf("HashTable occupiedSlotCounter =  %d, but expected: %d", hashTable.occupiedSlotCounter, expectedOccupiedSlotCounter)
 	}
 }
 
