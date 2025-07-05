@@ -15,6 +15,32 @@ func TestCreateHashTable(t *testing.T) {
 
 }
 
+func TestGetPrimeNextSizeUp(t *testing.T) {
+	candidate := uint64(23)
+	expected := uint64(23)
+	prime := getPrime(candidate, true)
+
+	if prime != expected {
+		t.Errorf("expected computed prime to be: %d, got: %d", expected, prime)
+	}
+
+	candidate = uint64(46)
+	expected = uint64(53)
+	prime = getPrime(candidate, true)
+	if prime != expected {
+		t.Errorf("expected computed prime to be: %d, got: %d", expected, prime)
+	}
+
+
+	candidate = uint64(1610612741 *2 )
+	prime = getPrime(candidate,true)
+	expected = uint64(3221225533)
+	if prime != expected {
+		t.Errorf("expected computed prime to be: %d, got: %d", expected, prime)
+	}
+
+}
+
 func TestInsert(t *testing.T) {
 	hashTable := New(10)
 	key := "foo-1"
@@ -186,8 +212,15 @@ func BenchmarkInsertNoResize(b *testing.B) {
 			table.Insert(key, i)
 		}
 
-		b.Logf("Total collisions: %d", table.collistionCount)
+		//b.Logf("Total collisions: %d", table.collistionCount)
 
 	}
 
 }
+
+// using key: fmt.Sprintf("foudhiuwediwuendiw1uend834u2390u3029u402--4-4-423e23eo-%d", i*1000000000000)
+// Before modifying fnv hash
+// BenchmarkInsertNoResize-12           100         300636513 ns/op         9040243 B/op    1019756 allocs/op
+
+// After modifying fnv hash
+//BenchmarkInsertNoResize-12           100         298962644 ns/op         9040275 B/op    1019756 allocs/op
