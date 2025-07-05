@@ -83,14 +83,13 @@ func TestResizeDown(t *testing.T) {
 
 	hashTable.Delete("foo-0")
 
-
 	if hashTable.length != expectedLength {
 
 		t.Errorf("HashTable length = %d, but expected: %d", hashTable.length, expectedLength)
 	}
 
 	expectedActiveSlotCounter := 2
-	expectedOccupiedSlotCounter :=2
+	expectedOccupiedSlotCounter := 2
 	if hashTable.activeSlotCounter != uint64(expectedActiveSlotCounter) {
 		t.Errorf("HashTable activeSlotCounter =  %d, but expected: %d", hashTable.activeSlotCounter, expectedActiveSlotCounter)
 	}
@@ -99,29 +98,29 @@ func TestResizeDown(t *testing.T) {
 	}
 }
 
-func TestUpdateValue( t *testing.T){
+func TestUpdateValue(t *testing.T) {
 	var length uint64 = 10
 	hashTable := New(length)
 	key := "foo-1"
-	hashTable.Insert(key,100)
+	hashTable.Insert(key, 100)
 	hashTable.Insert(key, 200)
 	value, err := hashTable.Search(key)
-	if err != nil{
+	if err != nil {
 		t.Errorf("Expected 200, got error: %v", err)
 	}
-	if value != 200{
-		t.Errorf("Value should equal 200, got: %d",value)
+	if value != 200 {
+		t.Errorf("Value should equal 200, got: %d", value)
 	}
 }
 
-func TestProbingWhenInserting( t *testing.T){
+func TestProbingWhenInserting(t *testing.T) {
 	var length uint64 = 5
 	hashTable := New(length)
-	keyA:="foo-1" // This would hash to 3
-	keyB :="foo-111" // This would hash to 3
-	hashTable.Insert(keyA,200)
+	keyA := "foo-1"   // This would hash to 3
+	keyB := "foo-111" // This would hash to 3
+	hashTable.Insert(keyA, 200)
 
-	hashTable.Insert(keyB,400)
+	hashTable.Insert(keyB, 400)
 	value, err := hashTable.Search(keyB)
 	if value == nil {
 		t.Errorf(`Search(%s) = nil, want %d, error: %v`, keyB, value, err)
@@ -131,35 +130,35 @@ func TestProbingWhenInserting( t *testing.T){
 func BenchmarkSearchExistingKey(b *testing.B) {
 	var length uint64 = 2000000
 	key := "foo-3300"
-	totalItems:= 1000000
+	totalItems := 1000000
 	hashTable := New(length)
 	for i := 0; i < totalItems; i++ {
 		hashTable.Insert(fmt.Sprintf("foo-%d", i), i)
 	}
-    b.ResetTimer()
-    for i := 0; i < b.N; i++ {
-        value, err := hashTable.Search(key)
-		if value == nil{
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		value, err := hashTable.Search(key)
+		if value == nil {
 			b.Errorf(`Search(%s) = %v, want 3300, error: %v`, key, value, err)
 		}
-    }
+	}
 }
 
 func BenchmarkNonExistingKey(b *testing.B) {
 	var length uint64 = 2000000
 	key := "foo-%300"
-	totalItems:= 1000000
+	totalItems := 1000000
 	hashTable := New(length)
 	for i := 0; i < totalItems; i++ {
 		hashTable.Insert(fmt.Sprintf("foo-%d", i), i)
 	}
-    b.ResetTimer()
-    for i := 0; i < b.N; i++ {
-        value, err := hashTable.Search(key)
-		if value != nil{
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		value, err := hashTable.Search(key)
+		if value != nil {
 			b.Errorf(`Search(%s) = %v, want nil, error: %v`, key, value, err)
 		}
-    }
+	}
 }
 
 func BenchmarkInsertNoResize(b *testing.B) {
@@ -170,12 +169,11 @@ func BenchmarkInsertNoResize(b *testing.B) {
 	// 65.980232 MBs -> with pointers to data structs
 	// 15.98 Mbs -> with actual data structs
 
-
 	totalKeys := 1000_000
 	keys := make([]string, totalKeys)
-	
-	for i := range totalKeys{
-		keys[i] = fmt.Sprintf("foo-%d",i)
+
+	for i := range totalKeys {
+		keys[i] = fmt.Sprintf("foo-%d", i)
 	}
 
 	var tableLength uint64 = 2000_000
@@ -184,11 +182,11 @@ func BenchmarkInsertNoResize(b *testing.B) {
 		b.StopTimer()
 		table := New(tableLength)
 		b.StartTimer()
-		for i,key:=range keys{
-			table.Insert(key,i)
+		for i, key := range keys {
+			table.Insert(key, i)
 		}
 
-		b.Logf("Total collisions: %d",table.collistionCount)
+		b.Logf("Total collisions: %d", table.collistionCount)
 
 	}
 

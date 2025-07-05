@@ -17,34 +17,33 @@ var primes = []uint64{
 	17,
 	23,
 	37,
-    53,
-    97,
-    193,
-    389,
-    769,
-    1543,
-    3079,
-    6151,
-    12289,
-    24593,
-    49157,
-    98317,
-    196613,
-    393241,
-    786433,
-    1572869,
-    3145739,
-    6291469,
-    12582917,
-    25165843,
-    50331653,
-    100663319,
-    201326611,
-    402653189,
-    805306457,
-    1610612741,
+	53,
+	97,
+	193,
+	389,
+	769,
+	1543,
+	3079,
+	6151,
+	12289,
+	24593,
+	49157,
+	98317,
+	196613,
+	393241,
+	786433,
+	1572869,
+	3145739,
+	6291469,
+	12582917,
+	25165843,
+	50331653,
+	100663319,
+	201326611,
+	402653189,
+	805306457,
+	1610612741,
 }
-
 
 type data struct {
 	key           string
@@ -52,7 +51,7 @@ type data struct {
 	isSoftDeleted bool
 }
 
-func pickLargestLength(length uint64) uint64{
+func pickLargestLength(length uint64) uint64 {
 	for _, v := range primes {
 		if v >= length {
 			return v
@@ -61,22 +60,23 @@ func pickLargestLength(length uint64) uint64{
 	panic("The provided length is not supported!")
 }
 
-func pickSmallestLength(length uint64) uint64{
-	for i := len(primes)-1; i >= 0; i-- {
-		prime :=primes[i]
-		if prime <= length{
+func pickSmallestLength(length uint64) uint64 {
+	for i := len(primes) - 1; i >= 0; i-- {
+		prime := primes[i]
+		if prime <= length {
 			return prime
 		}
 
 	}
 	panic("The provided length is not supported!")
 }
+
 type HashTable struct {
 	length              uint64
 	slots               []data
 	activeSlotCounter   uint64
 	occupiedSlotCounter uint64
-	collistionCount uint64
+	collistionCount     uint64
 }
 
 func New(length uint64) *HashTable {
@@ -87,10 +87,9 @@ func New(length uint64) *HashTable {
 		slots:               make([]data, primeLength),
 		activeSlotCounter:   0,
 		occupiedSlotCounter: 0,
-		collistionCount: 0,
+		collistionCount:     0,
 	}
 }
-
 
 func (h *HashTable) fnvHash(key string) uint64 {
 
@@ -104,8 +103,8 @@ func (h *HashTable) hash(key string, collisionCount uint64) uint64 {
 	hash1 := hashKey % h.length
 	hash2 := 1 + (hashKey % (h.length - 1))
 
-	floatCollisionCount:= float64(collisionCount)
-	tetrahedralFloat := (math.Pow(floatCollisionCount,3) - floatCollisionCount) / 6
+	floatCollisionCount := float64(collisionCount)
+	tetrahedralFloat := (math.Pow(floatCollisionCount, 3) - floatCollisionCount) / 6
 	return ((hash1 + collisionCount*hash2) + uint64(tetrahedralFloat)) % h.length
 	//return (hash1 + collisionCount*hash2) % h.length
 }
@@ -124,7 +123,7 @@ func (h *HashTable) resize(newSize uint64) {
 
 	for i := range len(h.slots) {
 		item := h.slots[i]
-		
+
 		if item.value == nil || item.isSoftDeleted {
 			continue
 		}
@@ -165,13 +164,13 @@ func (h *HashTable) insert(slots []data, key string, value any) {
 		collisionCount++
 		h.collistionCount++
 		deltaLocation := h.hash(key, collisionCount)
-		
+
 		if deltaLocation == homeLocation {
 			break
 		}
 
 		h.updateValue(slots, deltaLocation, key, value)
-		
+
 		if slots[deltaLocation].value == nil {
 			h.insertItem(slots, deltaLocation, key, value)
 			return
@@ -185,7 +184,7 @@ func (h *HashTable) Insert(key string, value any) {
 	loadFactor := h.computeLoadFactor()
 	if loadFactor >= risizeUpThreshold {
 
-		newLength := pickLargestLength(h.length*2)
+		newLength := pickLargestLength(h.length * 2)
 		h.resize(newLength)
 	}
 	h.insert(h.slots, key, value)
@@ -236,7 +235,7 @@ func (h *HashTable) Delete(key string) error {
 	}
 	if item.key == key && !item.isSoftDeleted {
 		h.activeSlotCounter--
-		item.isSoftDeleted=true
+		item.isSoftDeleted = true
 		loadFactor := h.computeLoadFactor()
 		if loadFactor <= resizeDownThreshold {
 			newLength := pickSmallestLength(h.length / 2)
