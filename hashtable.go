@@ -4,9 +4,8 @@ import (
 	"errors"
 
 	"math"
-
 	// "fmt"
-//	"hash/fnv"
+	//	"hash/fnv"
 )
 
 const risizeUpThreshold float32 = 0.60
@@ -45,62 +44,134 @@ var primes = []uint64{
 	1610612741,
 }
 
+const fnvPrime uint64 = 1099511628211
+const maxUint64 uint64 = 18446744073709551615
+
 type data struct {
 	key           string
 	value         any
 	isSoftDeleted bool
 }
 
-func pickLargestLength(length uint64) uint64 {
+func pickLargestLength(candidate uint64) uint64 {
 	for _, v := range primes {
-		if v >= length {
+		if v >= candidate {
 			return v
 		}
 	}
-	panic("The provided length is not supported!")
+	return 0
 }
 
-func pickSmallestLength(length uint64) uint64 {
+func pickSmallestLength(candidate uint64) uint64 {
 	for i := len(primes) - 1; i >= 0; i-- {
 		prime := primes[i]
-		if prime <= length {
+		if prime <= candidate {
 			return prime
 		}
 
 	}
-	panic("The provided length is not supported!")
+	return 0
 }
 
-const fnvPrime uint64 = 1099511628211
+func isPrime(candidate uint64) bool {
+
+	limit := uint64(math.Sqrt(float64(candidate)))
+
+	for i := uint64(3); i <= limit; i += 2 {
+		
+		// if even return false
+		if candidate % i == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func computePrimeNumber(candidate uint64) uint64 {
+	var start uint64 = 0
+
+	if candidate%2 == 0 {
+		start = candidate + uint64(1)
+	}
+	
+	for i := start; i < maxUint64; i += 2 {
+		
+		if isPrime(i) {
+			return i
+		}
+	}
+
+	return uint64(0)
+
+}
+
+
+func getPrime(candidate uint64, nextSizeUp bool) uint64 {
+
+	var foundPrime uint64 = 0
+
+	if nextSizeUp {
+		foundPrime = pickLargestLength(candidate)
+	} else {
+		foundPrime = pickSmallestLength(candidate)
+	}
+	if foundPrime != 0 {
+		return foundPrime
+	}
+
+	// Compute prime number from candidate if not found
+	// in pre-computed primes array
+	foundPrime = computePrimeNumber(candidate)
+
+	if foundPrime == 0 {
+		panic("Prime could not be found!")
+	}
+	return foundPrime
+
+}
 
 type HashTable struct {
-	length              uint64
-	slots               []data
-	activeSlotCounter   uint64
-	occupiedSlotCounter uint64
-	debugCollistionCount     uint64
+	length               uint64
+	slots                []data
+	activeSlotCounter    uint64
+	occupiedSlotCounter  uint64
+	debugCollistionCount uint64
 }
 
 func New(length uint64) *HashTable {
 
 	primeLength := pickLargestLength(length)
 	return &HashTable{
-		length:              primeLength,
-		slots:               make([]data, primeLength),
-		activeSlotCounter:   0,
-		occupiedSlotCounter: 0,
-		debugCollistionCount:     0,
+		length:               primeLength,
+		slots:                make([]data, primeLength),
+		activeSlotCounter:    0,
+		occupiedSlotCounter:  0,
+		debugCollistionCount: 0,
 	}
 }
 
+func (h *HashTable) computeNextSizeDown() uint64 {
+
+	candidate := h.length / 2
+	return getPrime(candidate, false)
+}
+
+func (h *HashTable) computeNextSizeUp() uint64 {
+	if h.length*2 >= maxUint64 {
+		panic("The hash table cant be resized again because it will overflow uint64!")
+	}
+	candidate := h.length * 2
+
+	return getPrime(candidate, true)
+}
 
 func (h *HashTable) fnvHash(key string) uint64 {
 	var hash uint64 = 14695981039346656037
-	for _, char := range key{
-		hash ^=uint64(char)
-		hash*=fnvPrime
-	}		
-	return hash	
+	for _, char := range key {
+		hash ^= uint64(char)
+		hash *= fnvPrime
+	}
+	return hash
 }
 
 // func (h *HashTable) fnvHash(key string) uint64 {
@@ -196,7 +267,7 @@ func (h *HashTable) Insert(key string, value any) {
 	loadFactor := h.computeLoadFactor()
 	if loadFactor >= risizeUpThreshold {
 
-		newLength := pickLargestLength(h.length * 2)
+		newLength := h.computeNextSizeUp()
 		h.resize(newLength)
 	}
 	h.insert(h.slots, key, value)
@@ -250,7 +321,7 @@ func (h *HashTable) Delete(key string) error {
 		item.isSoftDeleted = true
 		loadFactor := h.computeLoadFactor()
 		if loadFactor <= resizeDownThreshold {
-			newLength := pickSmallestLength(h.length / 2)
+			newLength := h.computeNextSizeDown()
 			h.resize(newLength)
 		}
 		return nil
