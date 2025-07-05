@@ -31,9 +31,8 @@ func TestGetPrimeNextSizeUp(t *testing.T) {
 		t.Errorf("expected computed prime to be: %d, got: %d", expected, prime)
 	}
 
-
-	candidate = uint64(1610612741 *2 )
-	prime = getPrime(candidate,true)
+	candidate = uint64(1610612741 * 2)
+	prime = getPrime(candidate, true)
 	expected = uint64(3221225533)
 	if prime != expected {
 		t.Errorf("expected computed prime to be: %d, got: %d", expected, prime)

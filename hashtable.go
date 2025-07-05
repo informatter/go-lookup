@@ -78,9 +78,9 @@ func isPrime(candidate uint64) bool {
 	limit := uint64(math.Sqrt(float64(candidate)))
 
 	for i := uint64(3); i <= limit; i += 2 {
-		
+
 		// if even return false
-		if candidate % i == 0 {
+		if candidate%i == 0 {
 			return false
 		}
 	}
@@ -93,9 +93,9 @@ func computePrimeNumber(candidate uint64) uint64 {
 	if candidate%2 == 0 {
 		start = candidate + uint64(1)
 	}
-	
+
 	for i := start; i < maxUint64; i += 2 {
-		
+
 		if isPrime(i) {
 			return i
 		}
@@ -104,7 +104,6 @@ func computePrimeNumber(candidate uint64) uint64 {
 	return uint64(0)
 
 }
-
 
 func getPrime(candidate uint64, nextSizeUp bool) uint64 {
 
