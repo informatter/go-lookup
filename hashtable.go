@@ -124,7 +124,7 @@ func (h *HashTable) resize(newSize uint64) {
 
 	for i := range len(h.slots) {
 		item := h.slots[i]
-
+		
 		if item.value == nil || item.isSoftDeleted {
 			continue
 		}
@@ -226,7 +226,8 @@ func (h *HashTable) Delete(key string) error {
 
 	var collisionCount uint64 = 0
 	homeLocation := h.hash(key, collisionCount)
-	item := h.slots[homeLocation]
+	item := &h.slots[homeLocation]
+
 	if item.value == nil {
 		return errors.New(keyNotFoundErrorMsg)
 	}
@@ -245,8 +246,6 @@ func (h *HashTable) Delete(key string) error {
 	}
 
 	// Probe!
-
-
 
 	for {
 		collisionCount++
