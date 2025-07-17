@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/beevik/guid"
 	"testing"
 )
 
@@ -211,8 +212,6 @@ func BenchmarkInsertNoResize(b *testing.B) {
 			table.Insert(key, i)
 		}
 
-		//b.Logf("Total collisions: %d", table.collistionCount)
-
 	}
 
 }
@@ -223,3 +222,39 @@ func BenchmarkInsertNoResize(b *testing.B) {
 
 // After modifying fnv hash
 //BenchmarkInsertNoResize-12           100         298962644 ns/op         9040275 B/op    1019756 allocs/op
+
+func BenchmarkFnvHash1a(b *testing.B) {
+	for _, totalKeys := range []int{1000, 50_000, 1000_000} {
+		b.Run(fmt.Sprintf("keys = %d", totalKeys), func(b *testing.B) {
+			keys := make([]string, totalKeys)
+			for i := range keys {
+				guid := guid.New()
+				keys[i] = guid.String()
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				for _, key := range keys {
+					fnvHash(key)
+				}
+			}
+		})
+	}
+}
+func BenchmarkLibFnvHash1a(b *testing.B) {
+
+	for _, totalKeys := range []int{1000, 50_000, 1000_000} {
+		b.Run(fmt.Sprintf("keys = %d", totalKeys), func(b *testing.B) {
+			keys := make([]string, totalKeys)
+			for i := range keys {
+				guid := guid.New()
+				keys[i] = guid.String()
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				for _, key := range keys {
+					fnvHashLib(key)
+				}
+			}
+		})
+	}
+}
