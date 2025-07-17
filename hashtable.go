@@ -5,7 +5,7 @@ import (
 
 	"math"
 	// "fmt"
-	//	"hash/fnv"
+	"hash/fnv"
 )
 
 const risizeUpThreshold float32 = 0.60
@@ -129,6 +129,26 @@ func getPrime(candidate uint64, nextSizeUp bool) uint64 {
 
 }
 
+// Custom implementation of the FNV-1a hashing algorithm
+func fnvHash(key string) uint64 {
+	var hash uint64 = 14695981039346656037
+	len := len(key)
+	for i := 0; i < len; i++ {
+		hash ^= uint64(key[i])
+		hash *= fnvPrime
+
+	}
+
+	return hash
+}
+
+func fnvHashLib(key string) uint64 {
+
+	hash := fnv.New64a()
+	hash.Write([]byte(key))
+	return hash.Sum64()
+}
+
 type HashTable struct {
 	length               uint64
 	slots                []data
@@ -164,24 +184,8 @@ func (h *HashTable) computeNextSizeUp() uint64 {
 	return getPrime(candidate, true)
 }
 
-func (h *HashTable) fnvHash(key string) uint64 {
-	var hash uint64 = 14695981039346656037
-	for _, char := range key {
-		hash ^= uint64(char)
-		hash *= fnvPrime
-	}
-	return hash
-}
-
-// func (h *HashTable) fnvHash(key string) uint64 {
-
-// 	hash := fnv.New64a()
-// 	hash.Write([]byte(key))
-// 	return hash.Sum64()
-// }
-
-func (h *HashTable) hash(key string, collisionCount uint64) uint64 {
-	hashKey := h.fnvHash(key)
+func (h *HashTable) doubleHashing(key string, collisionCount uint64) uint64 {
+	hashKey := fnvHash(key)
 	hash1 := hashKey % h.length
 	hash2 := 1 + (hashKey % (h.length - 1))
 
@@ -232,7 +236,7 @@ func (*HashTable) updateValue(slots []data, index uint64, key string, value any)
 
 func (h *HashTable) insert(slots []data, key string, value any) {
 	var collisionCount uint64 = 0
-	homeLocation := h.hash(key, collisionCount)
+	homeLocation := h.doubleHashing(key, collisionCount)
 
 	if slots[homeLocation].value == nil {
 		h.insertItem(slots, homeLocation, key, value)
@@ -245,7 +249,7 @@ func (h *HashTable) insert(slots []data, key string, value any) {
 	for {
 		collisionCount++
 		h.debugCollistionCount++
-		deltaLocation := h.hash(key, collisionCount)
+		deltaLocation := h.doubleHashing(key, collisionCount)
 
 		if deltaLocation == homeLocation {
 			break
@@ -269,12 +273,13 @@ func (h *HashTable) Insert(key string, value any) {
 		newLength := h.computeNextSizeUp()
 		h.resize(newLength)
 	}
+	// TODO: Reuse soft deleted cells when inserting
 	h.insert(h.slots, key, value)
 }
 
 func (h *HashTable) Search(key string) (any, error) {
 	var collisionCount uint64 = 0
-	homeLocation := h.hash(key, collisionCount)
+	homeLocation := h.doubleHashing(key, collisionCount)
 	item := h.slots[homeLocation]
 	if item.value == nil {
 		return nil, errors.New(keyNotFoundErrorMsg)
@@ -286,7 +291,7 @@ func (h *HashTable) Search(key string) (any, error) {
 	// Probe!
 	for {
 		collisionCount++
-		deltaLocation := h.hash(key, collisionCount)
+		deltaLocation := h.doubleHashing(key, collisionCount)
 		if deltaLocation == homeLocation {
 			break
 		}
@@ -303,10 +308,12 @@ func (h *HashTable) Search(key string) (any, error) {
 	return nil, errors.New(keyNotFoundErrorMsg)
 }
 
+
+
 func (h *HashTable) Delete(key string) error {
 
 	var collisionCount uint64 = 0
-	homeLocation := h.hash(key, collisionCount)
+	homeLocation := h.doubleHashing(key, collisionCount)
 	item := &h.slots[homeLocation]
 
 	if item.value == nil {
@@ -330,7 +337,7 @@ func (h *HashTable) Delete(key string) error {
 
 	for {
 		collisionCount++
-		deltaLocation := h.hash(key, collisionCount)
+		deltaLocation := h.doubleHashing(key, collisionCount)
 		if deltaLocation == homeLocation {
 			break
 		}
