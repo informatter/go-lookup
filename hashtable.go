@@ -50,7 +50,6 @@ const maxUint64 uint64 = 18446744073709551615
 type data struct {
 	key           string
 	value         any
-	isSoftDeleted bool
 }
 
 func pickLargestLength(candidate uint64) uint64 {
@@ -210,7 +209,7 @@ func (h *HashTable) resize(newSize uint64) {
 	for i := range len(h.slots) {
 		item := h.slots[i]
 
-		if item.value == nil || item.isSoftDeleted {
+		if item.value == nil {
 			continue
 		}
 
@@ -273,7 +272,6 @@ func (h *HashTable) Insert(key string, value any) {
 		newLength := h.computeNextSizeUp()
 		h.resize(newLength)
 	}
-	// TODO: Reuse soft deleted cells when inserting
 	h.insert(h.slots, key, value)
 }
 
@@ -284,7 +282,7 @@ func (h *HashTable) Search(key string) (any, error) {
 	if item.value == nil {
 		return nil, errors.New(keyNotFoundErrorMsg)
 	}
-	if item.key == key && !item.isSoftDeleted {
+	if item.key == key && item.value != nil {
 		return item.value, nil
 	}
 
@@ -300,7 +298,7 @@ func (h *HashTable) Search(key string) (any, error) {
 			return nil, errors.New(keyNotFoundErrorMsg)
 		}
 
-		if item.key == key && !item.isSoftDeleted {
+		if item.key == key && item.value !=nil {
 			return item.value, nil
 		}
 	}
@@ -310,7 +308,19 @@ func (h *HashTable) Search(key string) (any, error) {
 
 
 
+func ( h *HashTable) deleteItem( item *data){
+	item.value = nil
+	h.activeSlotCounter--
+	loadFactor := h.computeLoadFactor()
+	if loadFactor <= resizeDownThreshold {
+		newLength := pickSmallestLength(h.length / 2)
+		h.resize(newLength)
+	}
+}
+
 func (h *HashTable) Delete(key string) error {
+
+	// TODO: Test deletion when probing
 
 	var collisionCount uint64 = 0
 	homeLocation := h.doubleHashing(key, collisionCount)
@@ -319,17 +329,12 @@ func (h *HashTable) Delete(key string) error {
 	if item.value == nil {
 		return errors.New(keyNotFoundErrorMsg)
 	}
-	if item.key == key && item.isSoftDeleted {
+	if item.key == key && item.value == nil {
 		return errors.New(keyNotFoundErrorMsg)
 	}
-	if item.key == key && !item.isSoftDeleted {
-		h.activeSlotCounter--
-		item.isSoftDeleted = true
-		loadFactor := h.computeLoadFactor()
-		if loadFactor <= resizeDownThreshold {
-			newLength := h.computeNextSizeDown()
-			h.resize(newLength)
-		}
+	if item.key == key && item.value !=nil {
+
+		h.deleteItem(item)
 		return nil
 	}
 
@@ -341,19 +346,12 @@ func (h *HashTable) Delete(key string) error {
 		if deltaLocation == homeLocation {
 			break
 		}
-		item := h.slots[deltaLocation]
+		item := &h.slots[deltaLocation]
 		if item.value == nil {
 			return errors.New(keyNotFoundErrorMsg)
 		}
-		if item.key == key && !item.isSoftDeleted {
-			item.isSoftDeleted = true
-
-			h.activeSlotCounter--
-			loadFactor := h.computeLoadFactor()
-			if loadFactor <= resizeDownThreshold {
-				newLength := pickSmallestLength(h.length / 2)
-				h.resize(newLength)
-			}
+		if item.key == key && item.value != nil {
+			h.deleteItem(item)
 			return nil
 		}
 	}
