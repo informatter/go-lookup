@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 
+
 	"math"
 	// "fmt"
 	"hash/fnv"
@@ -47,8 +48,26 @@ var primes = []uint64{
 const fnvPrime uint64 = 1099511628211
 const maxUint64 uint64 = 18446744073709551615
 
+type nodeKey struct{
+	value string
+	hash uint64
+}
+func NewKey(key string ) nodeKey {
+
+	if len(key) > 36{
+		panic("A Key can't be longer than 36 characters!")
+	}
+
+	return nodeKey{
+		value: key,
+		hash: fnvHash(key),
+	}
+}
+
+
+
 type data struct {
-	key           string
+	key           nodeKey
 	value         any
 }
 
@@ -183,8 +202,8 @@ func (h *HashTable) computeNextSizeUp() uint64 {
 	return getPrime(candidate, true)
 }
 
-func (h *HashTable) doubleHashing(key string, collisionCount uint64) uint64 {
-	hashKey := fnvHash(key)
+func (h *HashTable) doubleHashing(key nodeKey, collisionCount uint64) uint64 {
+	hashKey := key.hash
 	hash1 := hashKey % h.length
 	hash2 := 1 + (hashKey % (h.length - 1))
 
@@ -218,7 +237,7 @@ func (h *HashTable) resize(newSize uint64) {
 	h.slots = newSlots
 
 }
-func (h *HashTable) insertItem(slots []data, index uint64, key string, value any) {
+func (h *HashTable) insertItem(slots []data, index uint64, key nodeKey, value any) {
 	slots[index] = data{
 		key:   key,
 		value: value,
@@ -227,13 +246,14 @@ func (h *HashTable) insertItem(slots []data, index uint64, key string, value any
 	h.occupiedSlotCounter++
 }
 
-func (*HashTable) updateValue(slots []data, index uint64, key string, value any) {
-	if slots[index].value != nil && slots[index].key == key {
+func (*HashTable) updateValue(slots []data, index uint64, key nodeKey, value any) {
+	if slots[index].value != nil && slots[index].key.value == key.value {
 		slots[index].value = value
 	}
 }
 
-func (h *HashTable) insert(slots []data, key string, value any) {
+func (h *HashTable) insert(slots []data, key nodeKey, value any) {
+
 	var collisionCount uint64 = 0
 	homeLocation := h.doubleHashing(key, collisionCount)
 
@@ -272,24 +292,29 @@ func (h *HashTable) Insert(key string, value any) {
 		newLength := h.computeNextSizeUp()
 		h.resize(newLength)
 	}
-	h.insert(h.slots, key, value)
+	k := NewKey(key)
+	
+	h.insert(h.slots, k, value)
 }
 
 func (h *HashTable) Search(key string) (any, error) {
 	var collisionCount uint64 = 0
-	homeLocation := h.doubleHashing(key, collisionCount)
+	
+	k:=NewKey(key)
+	
+	homeLocation := h.doubleHashing(k, collisionCount)
 	item := h.slots[homeLocation]
 	if item.value == nil {
 		return nil, errors.New(keyNotFoundErrorMsg)
 	}
-	if item.key == key && item.value != nil {
+	if item.key.value == key && item.value != nil {
 		return item.value, nil
 	}
 
 	// Probe!
 	for {
 		collisionCount++
-		deltaLocation := h.doubleHashing(key, collisionCount)
+		deltaLocation := h.doubleHashing(k, collisionCount)
 		if deltaLocation == homeLocation {
 			break
 		}
@@ -298,7 +323,7 @@ func (h *HashTable) Search(key string) (any, error) {
 			return nil, errors.New(keyNotFoundErrorMsg)
 		}
 
-		if item.key == key && item.value !=nil {
+		if item.key.value == key && item.value !=nil {
 			return item.value, nil
 		}
 	}
@@ -322,17 +347,19 @@ func (h *HashTable) Delete(key string) error {
 
 	// TODO: Test deletion when probing
 
+	k:=NewKey(key)
+
 	var collisionCount uint64 = 0
-	homeLocation := h.doubleHashing(key, collisionCount)
+	homeLocation := h.doubleHashing(k, collisionCount)
 	item := &h.slots[homeLocation]
 
 	if item.value == nil {
 		return errors.New(keyNotFoundErrorMsg)
 	}
-	if item.key == key && item.value == nil {
+	if item.key.value == key && item.value == nil {
 		return errors.New(keyNotFoundErrorMsg)
 	}
-	if item.key == key && item.value !=nil {
+	if item.key.value == key && item.value !=nil {
 
 		h.deleteItem(item)
 		return nil
@@ -342,7 +369,7 @@ func (h *HashTable) Delete(key string) error {
 
 	for {
 		collisionCount++
-		deltaLocation := h.doubleHashing(key, collisionCount)
+		deltaLocation := h.doubleHashing(k, collisionCount)
 		if deltaLocation == homeLocation {
 			break
 		}
@@ -350,7 +377,7 @@ func (h *HashTable) Delete(key string) error {
 		if item.value == nil {
 			return errors.New(keyNotFoundErrorMsg)
 		}
-		if item.key == key && item.value != nil {
+		if item.key.value == key && item.value != nil {
 			h.deleteItem(item)
 			return nil
 		}
