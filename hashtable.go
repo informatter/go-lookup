@@ -313,7 +313,7 @@ func ( h *HashTable) deleteItem( item *data){
 	h.activeSlotCounter--
 	loadFactor := h.computeLoadFactor()
 	if loadFactor <= resizeDownThreshold {
-		newLength := pickSmallestLength(h.length / 2)
+		newLength := h.computeNextSizeDown()
 		h.resize(newLength)
 	}
 }
