@@ -1,48 +1,91 @@
 
-# Go Lookup 
+# Go Lookup
 
-A custom hash table implementation written in Golang.
+**Go Lookup** is a custom hash table implementation in Go, and I am currently developing it for recreational purposes. I have recorded myself doing the development process and can be seen in my YouTube channel:
 
-## Resources
+- [Part 1](https://youtu.be/QQLxtAdRw4w)
+- [Part 2](https://youtu.be/q2v7FqwIwHI)
+- [Part 3](https://youtu.be/Cyf0M_f3FjE)
+- [Part 4](https://youtu.be/YH2FcnruuIE)
 
-**Go Language Reference**
-- [see](https://go.dev/ref/spec)
+---
 
-**Go Testing Package**
-- [see](https://pkg.go.dev/testing)
-- [flags](https://golang.org/cmd/go/#hdr-Testing_flags.)
+## Features
 
-**FNV Hash Function**
-The base hash function being used is called "Fowler–Noll–Vo" (FNV). Its a non-cryptographic function which is much faster than cryptographic ones to compute.
+- **Custom hash table** implementation.
+- Uses **FNV-1a** (Fowler–Noll–Vo) non-cryptographic hash function for fast lookups.
+- Users **Double Hashing** as a collision handling technique
+- Uses Prime numbers for hash table sizing to reduce collisions.
 
-- [fnv](https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function)
+---
 
-** Prime Numbers**
-- [see](https://en.wikipedia.org/wiki/Prime_number)
+## Quick Start
 
-## Unit Tests
+**Run all tests:**
+```bash
+go test .
+```
 
-Run all tests:
-`go test .`
+**Run all tests and benchmarks:**
+```bash
+go test -bench . -benchmem
+```
 
-Run all tests and all benchmarks:
+**Benchmark a specific test:**
+```bash
+go test -bench=<test> -benchmem
+```
 
-`go test -bench . -benchmem`
+**Benchmark multiple tests (regex):**
+```bash
+go test -bench='<test>|<test>' -benchmem
+```
 
-To benchmark a specific test:
+*Useful flags:*
+- Set iterations/time: `-benchtime 2s` or `-benchtime 100x`
+- Run specific test only: `go test -run `
 
-`go test  -bench=<benchMarkName> -benchmem`
+**Format code:**
+```bash
+go fmt .
+```
 
-Optional:
-- Add `-benchtime t` for iterations or specified time.
-- for example, `-benchtime 1h30s` or `-benchtime 5s`
-- `-benchtime 100x` to run 100 times
+## Benchmarks
 
-Run a specific test:
+### System
+- **CPU:** Intel® Core™ i7-8750H @ 2.20GHz
+- **Arch:** amd64
+- **OS:** Windows
 
-`go test --run <test-name>`
+### FNV-1a Custom Implementation
 
+| **Keys**    | **Runs** | **ns/op**    | **B/op** | **Allocs/op** |
+|-------------|----------|--------------|----------|---------------|
+| 1,000       | 100      | 11,288       | 0        | 0             |
+| 50,000      | 100      | 639,210      | 0        | 0             |
+| 1,000,000   | 100      | 12,491,896   | 0        | 0             |
 
-## Formatting
+### Go Stdlib `hash/fnv`
 
-`go fmt .`
+| **Keys**    | **Runs** | **ns/op**    | **B/op** | **Allocs/op** |
+|-------------|----------|--------------|----------|---------------|
+| 1,000       | 100      | 30,330       | 0        | 0             |
+| 50,000      | 100      | 1,452,023    | 0        | 0             |
+| 1,000,000   | 100      | 29,547,213   | 0        | 0             |
+
+---
+
+## References
+
+- **Go Language Reference:** [Go Spec][1]
+- **Go Testing Package:** [testing docs][2], [testing flags][3]
+- **FNV Hash Function:** [Wikipedia][4]
+- **Prime Numbers:** [Wikipedia][5]
+- **Double Hashing:** [Wikipedia][6]
+
+[1]: https://go.dev/ref/spec
+[2]: https://pkg.go.dev/testing
+[3]: https://golang.org/cmd/go/#hdr-Testing_flags.
+[4]: https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+[5]: https://en.wikipedia.org/wiki/Prime_number
+[6]: https://en.wikipedia.org/wiki/Double_hashing
