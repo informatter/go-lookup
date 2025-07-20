@@ -6,6 +6,16 @@ import (
 	"testing"
 )
 
+func TestNodeKeyMaxCharactersExceeded( t *testing.T){
+    defer func() {
+        if r := recover(); r == nil {
+            t.Errorf("expected panic, but none occurred")
+        }
+    }()
+
+	NewKey("747447474788323824328947329847328974329874328974328974329874238974")
+}
+
 func TestCreateHashTable(t *testing.T) {
 	targetLength := 10
 	actualLength := 17
@@ -159,7 +169,8 @@ func BenchmarkSearchExistingKey(b *testing.B) {
 	totalItems := 1000000
 	hashTable := New(length)
 	for i := 0; i < totalItems; i++ {
-		hashTable.Insert(fmt.Sprintf("foo-%d", i), i)
+		guid := guid.New()
+		hashTable.Insert(guid.String(), i)
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -176,7 +187,8 @@ func BenchmarkNonExistingKey(b *testing.B) {
 	totalItems := 1000000
 	hashTable := New(length)
 	for i := 0; i < totalItems; i++ {
-		hashTable.Insert(fmt.Sprintf("foo-%d", i), i)
+		guid := guid.New()
+		hashTable.Insert(guid.String(), i)
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -194,12 +206,21 @@ func BenchmarkInsertNoResize(b *testing.B) {
 
 	// 65.980232 MBs -> with pointers to data structs
 	// 15.98 Mbs -> with actual data structs
+	
+	// with isSoftDeleted still present in the data struct  and computing hashFnv every time
+	// BenchmarkInsertNoResize-12           100         271884392 ns/op        10718200 B/op    1089742 allocs/op
+	
+	// without isSoftDeleted in the data struct and computing hashFnv every time
+	// BenchmarkInsertNoResize-12           100         267893551 ns/op        10718226 B/op    1089742 allocs/op
 
+	// // without isSoftDeleted in the data struct and computing fnv hash only once by using nodeKey
+	// BenchmarkInsertNoResize-12           100         258080503 ns/op        10718210 B/op    1089742 allocs/op
 	totalKeys := 1000_000
 	keys := make([]string, totalKeys)
 
-	for i := range totalKeys {
-		keys[i] = fmt.Sprintf("foo-%d", i)
+	for i := 0; i < totalKeys; i++ {
+		guid := guid.New()
+		keys[i] = guid.String()
 	}
 
 	var tableLength uint64 = 2000_000
