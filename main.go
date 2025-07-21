@@ -1,18 +1,32 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"unsafe"
+)
+
+type node struct {
+	key   nodeKey
+	value any
+	// isSoftDeleted bool
+}
 
 func main() {
-
-	//fmt.Println("hellow world!")
-	var length uint64 = 101
-	h := New(length)
-	// fmt.Print("slots:\n", h.slots)
-	// foo-111 -> 3
-	// foo-1 -> 3
-	// h.Insert()
-	h.Insert("foo-1", 40)
-	fmt.Print("slots:\n", h.slots)
-	fmt.Printf("item: %v\n", h.slots[3])
-
+	fmt.Printf("size: %d bytes", unsafe.Sizeof(node{}))
 }
+
+// 0-15, 16-32, 33-39
+
+// 00X00  key
+// 00X01  key
+// ...
+// 00X-15 key
+// 00X-16 value
+// 00X-17 value
+// ....
+// 00X-32 value
+// 00X-33 isSoftDeleted
+// 00X-34 padding (1 byte)
+// 00X-35 padding (1 byte)
+// ...
+// 00X39  padding

@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-func TestNodeKeyMaxCharactersExceeded( t *testing.T){
-    defer func() {
-        if r := recover(); r == nil {
-            t.Errorf("expected panic, but none occurred")
-        }
-    }()
+func TestNodeKeyMaxCharactersExceeded(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("expected panic, but none occurred")
+		}
+	}()
 
 	NewKey("747447474788323824328947329847328974329874328974328974329874238974")
 }
@@ -206,10 +206,10 @@ func BenchmarkInsertNoResize(b *testing.B) {
 
 	// 65.980232 MBs -> with pointers to data structs
 	// 15.98 Mbs -> with actual data structs
-	
+
 	// with isSoftDeleted still present in the data struct  and computing hashFnv every time
 	// BenchmarkInsertNoResize-12           100         271884392 ns/op        10718200 B/op    1089742 allocs/op
-	
+
 	// without isSoftDeleted in the data struct and computing hashFnv every time
 	// BenchmarkInsertNoResize-12           100         267893551 ns/op        10718226 B/op    1089742 allocs/op
 
