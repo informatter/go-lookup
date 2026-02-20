@@ -64,9 +64,10 @@ func NewKey(key string) nodeKey {
 	}
 }
 
-type data struct {
-	key   nodeKey
-	value any
+type data[V any] struct {
+	key      nodeKey
+	value    V
+	occupied bool
 }
 
 func pickLargestLength(candidate uint64) uint64 {
@@ -165,33 +166,33 @@ func fnvHashLib(key string) uint64 {
 	return hash.Sum64()
 }
 
-type HashTable struct {
+type HashTable[V any] struct {
 	length               uint64
-	slots                []data
+	slots                []data[V]
 	activeSlotCounter    uint64
 	occupiedSlotCounter  uint64
 	debugCollistionCount uint64
 }
 
-func New(length uint64) *HashTable {
+func New[V any](length uint64) *HashTable[V] {
 
 	primeLength := pickLargestLength(length)
-	return &HashTable{
+	return &HashTable[V]{
 		length:               primeLength,
-		slots:                make([]data, primeLength),
+		slots:                make([]data[V], primeLength),
 		activeSlotCounter:    0,
 		occupiedSlotCounter:  0,
 		debugCollistionCount: 0,
 	}
 }
 
-func (h *HashTable) computeNextSizeDown() uint64 {
+func (h *HashTable[V]) computeNextSizeDown() uint64 {
 
 	candidate := h.length / 2
 	return getPrime(candidate, false)
 }
 
-func (h *HashTable) computeNextSizeUp() uint64 {
+func (h *HashTable[V]) computeNextSizeUp() uint64 {
 	if h.length*2 >= maxUint64 {
 		panic("The hash table cant be resized again because it will overflow uint64!")
 	}
@@ -200,7 +201,7 @@ func (h *HashTable) computeNextSizeUp() uint64 {
 	return getPrime(candidate, true)
 }
 
-func (h *HashTable) doubleHashing(key nodeKey, collisionCount uint64) uint64 {
+func (h *HashTable[V]) doubleHashing(key nodeKey, collisionCount uint64) uint64 {
 	hashKey := key.hash
 	hash1 := hashKey % h.length
 	hash2 := 1 + (hashKey % (h.length - 1))
@@ -211,22 +212,22 @@ func (h *HashTable) doubleHashing(key nodeKey, collisionCount uint64) uint64 {
 	//return (hash1 + collisionCount*hash2) % h.length
 }
 
-func (h *HashTable) computeLoadFactor() float32 {
+func (h *HashTable[V]) computeLoadFactor() float32 {
 
 	return float32(h.occupiedSlotCounter) / float32(h.length)
 }
 
-func (h *HashTable) resize(newSize uint64) {
+func (h *HashTable[V]) resize(newSize uint64) {
 
 	h.length = newSize
 	h.activeSlotCounter = 0
 	h.occupiedSlotCounter = 0
-	newSlots := make([]data, newSize)
+	newSlots := make([]data[V], newSize)
 
 	for i := range len(h.slots) {
 		item := h.slots[i]
 
-		if item.value == nil {
+		if !item.occupied {
 			continue
 		}
 
@@ -235,32 +236,37 @@ func (h *HashTable) resize(newSize uint64) {
 	h.slots = newSlots
 
 }
-func (h *HashTable) insertItem(slots []data, index uint64, key nodeKey, value any) {
-	slots[index] = data{
-		key:   key,
-		value: value,
+func (h *HashTable[V]) insertItem(slots []data[V], index uint64, key nodeKey, value V) {
+	slots[index] = data[V]{
+		key:      key,
+		value:    value,
+		occupied: true,
 	}
 	h.activeSlotCounter++
 	h.occupiedSlotCounter++
 }
 
-func (*HashTable) updateValue(slots []data, index uint64, key nodeKey, value any) {
-	if slots[index].value != nil && slots[index].key.value == key.value {
+func (*HashTable[V]) updateValue(slots []data[V], index uint64, key nodeKey, value V) bool {
+	if slots[index].occupied && slots[index].key.value == key.value {
 		slots[index].value = value
+		return true
 	}
+	return false
 }
 
-func (h *HashTable) insert(slots []data, key nodeKey, value any) {
+func (h *HashTable[V]) insert(slots []data[V], key nodeKey, value V) {
 
 	var collisionCount uint64 = 0
 	homeLocation := h.doubleHashing(key, collisionCount)
 
-	if slots[homeLocation].value == nil {
+	if !slots[homeLocation].occupied {
 		h.insertItem(slots, homeLocation, key, value)
 		return
 	}
 
-	h.updateValue(slots, homeLocation, key, value)
+	if h.updateValue(slots, homeLocation, key, value) {
+		return
+	}
 
 	// Start Probing
 	for {
@@ -272,9 +278,11 @@ func (h *HashTable) insert(slots []data, key nodeKey, value any) {
 			break
 		}
 
-		h.updateValue(slots, deltaLocation, key, value)
+		if h.updateValue(slots, deltaLocation, key, value) {
+			return
+		}
 
-		if slots[deltaLocation].value == nil {
+		if !slots[deltaLocation].occupied {
 			h.insertItem(slots, deltaLocation, key, value)
 			return
 		}
@@ -282,7 +290,7 @@ func (h *HashTable) insert(slots []data, key nodeKey, value any) {
 
 }
 
-func (h *HashTable) Insert(key string, value any) {
+func (h *HashTable[V]) Insert(key string, value V) {
 
 	loadFactor := h.computeLoadFactor()
 	if loadFactor >= risizeUpThreshold {
@@ -295,17 +303,18 @@ func (h *HashTable) Insert(key string, value any) {
 	h.insert(h.slots, k, value)
 }
 
-func (h *HashTable) Search(key string) (any, error) {
+func (h *HashTable[V]) Search(key string) (V, error) {
 	var collisionCount uint64 = 0
+	var zero V
 
 	k := NewKey(key)
 
 	homeLocation := h.doubleHashing(k, collisionCount)
 	item := h.slots[homeLocation]
-	if item.value == nil {
-		return nil, errors.New(keyNotFoundErrorMsg)
+	if !item.occupied {
+		return zero, errors.New(keyNotFoundErrorMsg)
 	}
-	if item.key.value == key && item.value != nil {
+	if item.key.value == key {
 		return item.value, nil
 	}
 
@@ -317,21 +326,24 @@ func (h *HashTable) Search(key string) (any, error) {
 			break
 		}
 		item := h.slots[deltaLocation]
-		if item.value == nil {
-			return nil, errors.New(keyNotFoundErrorMsg)
+		if !item.occupied {
+			return zero, errors.New(keyNotFoundErrorMsg)
 		}
 
-		if item.key.value == key && item.value != nil {
+		if item.key.value == key {
 			return item.value, nil
 		}
 	}
 
-	return nil, errors.New(keyNotFoundErrorMsg)
+	return zero, errors.New(keyNotFoundErrorMsg)
 }
 
-func (h *HashTable) deleteItem(item *data) {
-	item.value = nil
+func (h *HashTable[V]) deleteItem(item *data[V]) {
+	var zero V
+	item.value = zero
+	item.occupied = false
 	h.activeSlotCounter--
+	h.occupiedSlotCounter--
 	loadFactor := h.computeLoadFactor()
 	if loadFactor <= resizeDownThreshold {
 		newLength := h.computeNextSizeDown()
@@ -339,7 +351,7 @@ func (h *HashTable) deleteItem(item *data) {
 	}
 }
 
-func (h *HashTable) Delete(key string) error {
+func (h *HashTable[V]) Delete(key string) error {
 
 	// TODO: Test deletion when probing
 
@@ -349,13 +361,10 @@ func (h *HashTable) Delete(key string) error {
 	homeLocation := h.doubleHashing(k, collisionCount)
 	item := &h.slots[homeLocation]
 
-	if item.value == nil {
+	if !item.occupied {
 		return errors.New(keyNotFoundErrorMsg)
 	}
-	if item.key.value == key && item.value == nil {
-		return errors.New(keyNotFoundErrorMsg)
-	}
-	if item.key.value == key && item.value != nil {
+	if item.key.value == key {
 
 		h.deleteItem(item)
 		return nil
@@ -370,10 +379,10 @@ func (h *HashTable) Delete(key string) error {
 			break
 		}
 		item := &h.slots[deltaLocation]
-		if item.value == nil {
+		if !item.occupied {
 			return errors.New(keyNotFoundErrorMsg)
 		}
-		if item.key.value == key && item.value != nil {
+		if item.key.value == key {
 			h.deleteItem(item)
 			return nil
 		}
