@@ -113,6 +113,11 @@ When resizing:
 go test .
 ```
 
+**Format code:**
+```bash
+go fmt .
+```
+
 **Run all tests and benchmarks:**
 ```bash
 go test -bench . -benchmem
@@ -132,20 +137,16 @@ go test -bench='<test>|<test>' -benchmem
 - Set iterations/time: `-benchtime 2s` or `-benchtime 100x`
 - Run specific test only: `go test -run `
 
-**Format code:**
-```bash
-go fmt .
-```
-
 ## Benchmarks
 
 ### System
 
 - **CPU:** Intel® Core™ i7-8750H @ 2.20GHz
+- **Cores:** 12
 - **Arch:** amd64
 - **OS:** Windows
 
-### FNV-1a Custom Implementation
+## FNV-1a Custom Implementation
 
 | **Keys**   | **Runs** | **ns/op**   | **ns/op per key** | **B/op** | **Allocs/op** |
 |------------|----------|-------------|-------------------|----------|---------------|
@@ -153,7 +154,7 @@ go fmt .
 | 50,000     | 100      | 639,210     | **12.78**         | 0        | 0             |
 | 1,000,000  | 100      | 12,491,896  | **12.49**         | 0        | 0             |
 
-### Go Stdlib `hash/fnv`
+## Go Stdlib `hash/fnv`
 
 | **Keys**   | **Runs** | **ns/op**   | **ns/op per key** | **B/op** | **Allocs/op** |
 |------------|----------|-------------|-------------------|----------|---------------|
@@ -161,15 +162,63 @@ go fmt .
 | 50,000     | 100      | 1,452,023   | **29.04**         | 0        | 0             |
 | 1,000,000  | 100      | 29,547,213  | **29.55**         | 0        | 0             |
 
-### Insert 1 Million Keys (No Resize)
-
-Key length: 36 characters
-
-| **Runs** | **ns/op**     | **B/op**    | **Allocs/op** | **ns/insertion**  |
-|----------|---------------|-------------|----------------|------------------|
-| 500      | 232,270,992   | 8,398,035   | 1,013,744       | **232.27**      |
-
 ---
+
+
+## Insert No Resize
+
+### Go map
+
+| **Benchmark**       | **Runs** | **Elements** |   **ns/op**  | **ns/op per key** | **B/op** | **Allocs/op** |
+|---------------------|--------:|------------:|------------:|------------------:|--------:|-------------:|
+| Insert No Resize    |     500 |   1,000,000 | 124,873,508 |            124.87 |   400,048 | 14,000 |
+
+### Custom hash table
+
+| **Benchmark**       | **Runs** | **Elements** |   **ns/op**  | **ns/op per key** | **B/op** | **Allocs/op** |
+|---------------------|--------:|------------:|------------:|------------------:|--------:|-------------:|
+| Insert No Resize    |     500 |   1,000,000 | 174,580,206 |            174.58 |   400,045 | 14,000 |
+
+
+
+## Search existing key
+
+### Go map
+
+| **Benchmark**          | **Runs** | **ns/op** | **B/op** | **Allocs/op** |
+|------------------------|--------:|---------:|--------:|-------------:|
+| Search existing key    |     500 |    11.40 |       0 |            0 |
+
+### Custom hash table
+
+| **Benchmark**          | **Runs** | **ns/op** | **B/op** | **Allocs/op** |
+|------------------------|--------:|---------:|--------:|-------------:|
+| Search existing key    |     500 |    63.80 |      16 |            1 |
+
+
+
+## Search non-existing key
+
+### Go map
+
+| **Benchmark**             | **Runs** | **ns/op** | **B/op** | **Allocs/op** |
+|---------------------------|--------:|---------:|--------:|-------------:|
+| Search non-existing key   |     500 |    12.00 |       0 |            0 |
+
+### Custom hash table
+
+| **Benchmark**             | **Runs** | **ns/op** | **B/op** | **Allocs/op** |
+|---------------------------|--------:|---------:|--------:|-------------:|
+| Search non-existing key   |     500 |    75.20 |      16 |            1 |
+
+**Legend**
+
+- **ns/op**: average number of nanoseconds per benchmark operation. For insert benchmarks the operation is the whole benchmark run (inserting all elements); for search benchmarks the operation is a single lookup.
+- **ns/op per key/lookup**: average number of nanoseconds per individual element operation — for inserts this is `ns/op / Elements`, for searches this equals `ns/op` because each benchmark operation performs one lookup.
+- **B/op**: average bytes allocated per benchmark operation.
+- **Allocs/op**: average number of memory allocations performed per benchmark operation.
+
+
 
 ## References
 
