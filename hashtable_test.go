@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/beevik/guid"
 	"testing"
+
+	"github.com/beevik/guid"
 )
 
 func TestNodeKeyMaxCharactersExceeded(t *testing.T) {
@@ -195,6 +196,41 @@ func BenchmarkNonExistingKey(b *testing.B) {
 		value, err := hashTable.Search(key)
 		if err == nil || value != 0 {
 			b.Errorf(`Search(%s) expected not found, got value=%v error=%v`, key, value, err)
+		}
+	}
+}
+
+
+func BenchmarkGoMapSearchExistingKey(b *testing.B) {
+	key := "foo-3300"
+	totalItems := 1000000
+	m := make(map[string]int, totalItems*2)
+	for i := 0; i < totalItems; i++ {
+		g := guid.New()
+		m[g.String()] = i
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, ok := m[key]
+		if ok {
+			b.Errorf("expected key %s to be missing", key)
+		}
+	}
+}
+
+func BenchmarkGoMapNonExistingKey(b *testing.B) {
+	key := "foo-%300"
+	totalItems := 1000000
+	m := make(map[string]int, totalItems*2)
+	for i := 0; i < totalItems; i++ {
+		g := guid.New()
+		m[g.String()] = i
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, ok := m[key]
+		if ok {
+			b.Errorf("expected key %s to be missing", key)
 		}
 	}
 }
