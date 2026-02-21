@@ -19,7 +19,7 @@ func TestNodeKeyMaxCharactersExceeded(t *testing.T) {
 func TestCreateHashTable(t *testing.T) {
 	targetLength := 10
 	actualLength := 17
-	hashTable := New(uint64(targetLength))
+	hashTable := New[int](uint64(targetLength))
 	if hashTable.length != uint64(actualLength) {
 		t.Errorf("HashTable length = %d, but should be: %d", hashTable.length, actualLength)
 	}
@@ -52,7 +52,7 @@ func TestGetPrimeNextSizeUp(t *testing.T) {
 }
 
 func TestInsert(t *testing.T) {
-	hashTable := New(10)
+	hashTable := New[int](10)
 	key := "foo-1"
 	hashTable.Insert(key, 500)
 	if hashTable.activeSlotCounter != 1 {
@@ -63,24 +63,24 @@ func TestInsert(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 
-	hashTable := New(10)
+	hashTable := New[int](10)
 	key := "foo-1"
 	value, err := hashTable.Search(key)
-	if value != nil {
-		t.Errorf(`Search(%s) = %v, want nil, error: %v`, key, value, err)
+	if err == nil || value != 0 {
+		t.Errorf(`Search(%s) = %v, want 0 with error, error: %v`, key, value, err)
 	}
 	targetValue := 500
 
 	hashTable.Insert(key, targetValue)
 	valueB, errB := hashTable.Search(key)
 
-	if valueB == nil {
-		t.Errorf(`Search(%s) = nil, want %v, error: %v`, key, targetValue, errB)
+	if errB != nil || valueB != targetValue {
+		t.Errorf(`Search(%s) = %v, want %v, error: %v`, key, valueB, targetValue, errB)
 	}
 }
 
 func TestDelete(t *testing.T) {
-	hashTable := New(10)
+	hashTable := New[int](10)
 	key := "foo-1"
 	err := hashTable.Delete(key)
 	if err == nil {
@@ -91,7 +91,7 @@ func TestDelete(t *testing.T) {
 func TestResizeUp(t *testing.T) {
 	var desiredLength uint64 = 40
 	var expectedLength uint64 = 193
-	hashTable := New(desiredLength)
+	hashTable := New[int](desiredLength)
 	totalItems := 35
 	for i := 0; i < totalItems; i++ {
 		hashTable.Insert(fmt.Sprintf("foo-%d", i), i*2)
@@ -110,7 +110,7 @@ func TestResizeUp(t *testing.T) {
 
 func TestResizeDown(t *testing.T) {
 	var desiredLength uint64 = 40
-	hashTable := New(desiredLength)
+	hashTable := New[int](desiredLength)
 	var expectedLength uint64 = 23
 
 	for i := 0; i < 3; i++ {
@@ -136,7 +136,7 @@ func TestResizeDown(t *testing.T) {
 
 func TestUpdateValue(t *testing.T) {
 	var length uint64 = 10
-	hashTable := New(length)
+	hashTable := New[int](length)
 	key := "foo-1"
 	hashTable.Insert(key, 100)
 	hashTable.Insert(key, 200)
@@ -151,15 +151,15 @@ func TestUpdateValue(t *testing.T) {
 
 func TestProbingWhenInserting(t *testing.T) {
 	var length uint64 = 5
-	hashTable := New(length)
+	hashTable := New[int](length)
 	keyA := "foo-1"   // This would hash to 3
 	keyB := "foo-111" // This would hash to 3
 	hashTable.Insert(keyA, 200)
 
 	hashTable.Insert(keyB, 400)
 	value, err := hashTable.Search(keyB)
-	if value == nil {
-		t.Errorf(`Search(%s) = nil, want %d, error: %v`, keyB, value, err)
+	if err != nil || value != 400 {
+		t.Errorf(`Search(%s) = %v, want %d, error: %v`, keyB, value, 400, err)
 	}
 }
 
@@ -167,7 +167,7 @@ func BenchmarkSearchExistingKey(b *testing.B) {
 	var length uint64 = 2000000
 	key := "foo-3300"
 	totalItems := 1000000
-	hashTable := New(length)
+	hashTable := New[int](length)
 	for i := 0; i < totalItems; i++ {
 		guid := guid.New()
 		hashTable.Insert(guid.String(), i)
@@ -175,8 +175,8 @@ func BenchmarkSearchExistingKey(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		value, err := hashTable.Search(key)
-		if value == nil {
-			b.Errorf(`Search(%s) = %v, want 3300, error: %v`, key, value, err)
+		if err == nil || value != 0 {
+			b.Errorf(`Search(%s) expected not found, got value=%v error=%v`, key, value, err)
 		}
 	}
 }
@@ -185,7 +185,7 @@ func BenchmarkNonExistingKey(b *testing.B) {
 	var length uint64 = 2000000
 	key := "foo-%300"
 	totalItems := 1000000
-	hashTable := New(length)
+	hashTable := New[int](length)
 	for i := 0; i < totalItems; i++ {
 		guid := guid.New()
 		hashTable.Insert(guid.String(), i)
@@ -193,8 +193,8 @@ func BenchmarkNonExistingKey(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		value, err := hashTable.Search(key)
-		if value != nil {
-			b.Errorf(`Search(%s) = %v, want nil, error: %v`, key, value, err)
+		if err == nil || value != 0 {
+			b.Errorf(`Search(%s) expected not found, got value=%v error=%v`, key, value, err)
 		}
 	}
 }
@@ -215,7 +215,7 @@ func BenchmarkInsertNoResize(b *testing.B) {
 
 	// // without isSoftDeleted in the data struct and computing fnv hash only once by using nodeKey
 	// BenchmarkInsertNoResize-12           100         258080503 ns/op        10718210 B/op    1089742 allocs/op
-	totalKeys := 1000_000
+	totalKeys := 1_000_000
 	keys := make([]string, totalKeys)
 
 	for i := 0; i < totalKeys; i++ {
@@ -223,11 +223,11 @@ func BenchmarkInsertNoResize(b *testing.B) {
 		keys[i] = guid.String()
 	}
 
-	var tableLength uint64 = 2000_000
+	var tableLength uint64 = 2_000_000
 
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		table := New(tableLength)
+		table := New[int](tableLength)
 		b.StartTimer()
 		for i, key := range keys {
 			table.Insert(key, i)
@@ -235,6 +235,27 @@ func BenchmarkInsertNoResize(b *testing.B) {
 
 	}
 
+}
+
+func BenchmarkGoMapInsertNoResize(b *testing.B) {
+	totalKeys := 1_000_000
+	keys := make([]string, totalKeys)
+	for i := 0; i < totalKeys; i++ {
+
+		guid := guid.New()
+		keys[i] = guid.String()
+	}
+	mapCapacity := 2_000_000
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		m := make(map[string]int, mapCapacity)
+		b.StartTimer()
+		for i, key := range keys {
+			m[key] = i
+		}
+	}
 }
 
 // using key: fmt.Sprintf("foudhiuwediwuendiw1uend834u2390u3029u402--4-4-423e23eo-%d", i*1000000000000)
