@@ -65,10 +65,23 @@ func NewKey(key string) nodeKey {
 }
 
 type data[V any] struct {
-	key      nodeKey
-	value    V
-	occupied bool
+	key   nodeKey
+	value V
+	state uint8
 }
+
+// Defines the three possible states of a slot in the hashtable.
+const (
+	// A slot is considered empty if it has never been occupied or has been deleted
+	// and marked as a tombstone.
+	slotEmpty uint8 = iota
+	// A slot is considered occupied if it contains a key-value pair that has not been deleted.
+	slotOccupied
+	// A tombstone is a marker for a slot that was occupied but has been deleted.
+	// It allows the probing sequence to continue correctly during search
+	// and insertion operations.
+	slotTombstone
+)
 
 func pickLargestLength(candidate uint64) uint64 {
 	for _, v := range primes {
@@ -206,10 +219,10 @@ func (h *HashTable[V]) doubleHashing(key nodeKey, collisionCount uint64) uint64 
 	hash1 := hashKey % h.length
 	hash2 := 1 + (hashKey % (h.length - 1))
 
-	floatCollisionCount := float64(collisionCount)
-	tetrahedralFloat := (math.Pow(floatCollisionCount, 3) - floatCollisionCount) / 6
-	return ((hash1 + collisionCount*hash2) + uint64(tetrahedralFloat)) % h.length
-	//return (hash1 + collisionCount*hash2) % h.length
+	//floatCollisionCount := float64(collisionCount)
+	//tetrahedralFloat := (math.Pow(floatCollisionCount, 3) - floatCollisionCount) / 6
+	//return ((hash1 + collisionCount*hash2) + uint64(tetrahedralFloat)) % h.length
+	return (hash1 + collisionCount*hash2) % h.length
 }
 
 func (h *HashTable[V]) computeLoadFactor() float32 {
@@ -227,7 +240,7 @@ func (h *HashTable[V]) resize(newSize uint64) {
 	for i := range len(h.slots) {
 		item := h.slots[i]
 
-		if !item.occupied {
+		if item.state != slotOccupied {
 			continue
 		}
 
@@ -237,17 +250,20 @@ func (h *HashTable[V]) resize(newSize uint64) {
 
 }
 func (h *HashTable[V]) insertItem(slots []data[V], index uint64, key nodeKey, value V) {
+	wasEmpty := slots[index].state == slotEmpty
 	slots[index] = data[V]{
-		key:      key,
-		value:    value,
-		occupied: true,
+		key:   key,
+		value: value,
+		state: slotOccupied,
 	}
 	h.activeSlotCounter++
-	h.occupiedSlotCounter++
+	if wasEmpty {
+		h.occupiedSlotCounter++
+	}
 }
 
 func (*HashTable[V]) updateValue(slots []data[V], index uint64, key nodeKey, value V) bool {
-	if slots[index].occupied && slots[index].key.value == key.value {
+	if slots[index].state == slotOccupied && slots[index].key.value == key.value {
 		slots[index].value = value
 		return true
 	}
@@ -258,10 +274,17 @@ func (h *HashTable[V]) insert(slots []data[V], key nodeKey, value V) {
 
 	var collisionCount uint64 = 0
 	homeLocation := h.doubleHashing(key, collisionCount)
+	var firstTombstone uint64
+	hasTombstone := false
 
-	if !slots[homeLocation].occupied {
+	if slots[homeLocation].state == slotEmpty {
 		h.insertItem(slots, homeLocation, key, value)
 		return
+	}
+
+	if slots[homeLocation].state == slotTombstone {
+		firstTombstone = homeLocation
+		hasTombstone = true
 	}
 
 	if h.updateValue(slots, homeLocation, key, value) {
@@ -282,10 +305,31 @@ func (h *HashTable[V]) insert(slots []data[V], key nodeKey, value V) {
 			return
 		}
 
-		if !slots[deltaLocation].occupied {
+		// If a tombstone is found during probing, it can be marked as the first tombstone found.
+		// This allows the insertion to reuse the tombstone slot if an empty slot is not found
+		// during the probing sequence.
+		if slots[deltaLocation].state == slotTombstone && !hasTombstone {
+			firstTombstone = deltaLocation
+			hasTombstone = true
+		}
+
+		// If an empty slot is found, we can insert the item there. However, if a tombstone was previously found,
+		// the item can be inserted at that index instead. This allows to reuse tombstone slots
+		// and avoid unnecessary probing in the future.
+		if slots[deltaLocation].state == slotEmpty {
+			if hasTombstone {
+				h.insertItem(slots, firstTombstone, key, value)
+				return
+			}
 			h.insertItem(slots, deltaLocation, key, value)
 			return
 		}
+	}
+
+	// If we have probed the whole table and found a tombstone, we can insert the item there
+	// This case is hit when the table is full of tombstones and we are trying to insert a new item
+	if hasTombstone {
+		h.insertItem(slots, firstTombstone, key, value)
 	}
 
 }
@@ -311,10 +355,10 @@ func (h *HashTable[V]) Search(key string) (V, error) {
 
 	homeLocation := h.doubleHashing(k, collisionCount)
 	item := h.slots[homeLocation]
-	if !item.occupied {
+	if item.state == slotEmpty {
 		return zero, errors.New(keyNotFoundErrorMsg)
 	}
-	if item.key.value == key {
+	if item.state == slotOccupied && item.key.value == key {
 		return item.value, nil
 	}
 
@@ -326,11 +370,11 @@ func (h *HashTable[V]) Search(key string) (V, error) {
 			break
 		}
 		item := h.slots[deltaLocation]
-		if !item.occupied {
+		if item.state == slotEmpty {
 			return zero, errors.New(keyNotFoundErrorMsg)
 		}
 
-		if item.key.value == key {
+		if item.state == slotOccupied && item.key.value == key {
 			return item.value, nil
 		}
 	}
@@ -341,9 +385,8 @@ func (h *HashTable[V]) Search(key string) (V, error) {
 func (h *HashTable[V]) deleteItem(item *data[V]) {
 	var zero V
 	item.value = zero
-	item.occupied = false
+	item.state = slotTombstone
 	h.activeSlotCounter--
-	h.occupiedSlotCounter--
 	loadFactor := h.computeLoadFactor()
 	if loadFactor <= resizeDownThreshold {
 		newLength := h.computeNextSizeDown()
@@ -361,10 +404,10 @@ func (h *HashTable[V]) Delete(key string) error {
 	homeLocation := h.doubleHashing(k, collisionCount)
 	item := &h.slots[homeLocation]
 
-	if !item.occupied {
+	if item.state == slotEmpty {
 		return errors.New(keyNotFoundErrorMsg)
 	}
-	if item.key.value == key {
+	if item.state == slotOccupied && item.key.value == key {
 
 		h.deleteItem(item)
 		return nil
@@ -379,10 +422,10 @@ func (h *HashTable[V]) Delete(key string) error {
 			break
 		}
 		item := &h.slots[deltaLocation]
-		if !item.occupied {
+		if item.state == slotEmpty {
 			return errors.New(keyNotFoundErrorMsg)
 		}
-		if item.key.value == key {
+		if item.state == slotOccupied && item.key.value == key {
 			h.deleteItem(item)
 			return nil
 		}
