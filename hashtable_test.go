@@ -31,8 +31,6 @@ func buildGoMap(keys []string, mapCapacity int) map[string]int {
 	return m
 }
 
-
-
 func findCollidingKeys(targetCount int, tableLength uint64) []string {
 	buckets := make(map[uint64][]string)
 	maxCandidates := 2_000_000
