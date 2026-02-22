@@ -7,6 +7,48 @@ import (
 	"github.com/beevik/guid"
 )
 
+func makeSequentialKeys(total int) []string {
+	keys := make([]string, total)
+	for i := 0; i < total; i++ {
+		keys[i] = fmt.Sprintf("key-%d", i)
+	}
+	return keys
+}
+
+func buildHashTable(keys []string, tableLength uint64) *HashTable[int] {
+	table := New[int](tableLength)
+	for i, key := range keys {
+		table.Insert(key, i)
+	}
+	return table
+}
+
+func buildGoMap(keys []string, mapCapacity int) map[string]int {
+	m := make(map[string]int, mapCapacity)
+	for i, key := range keys {
+		m[key] = i
+	}
+	return m
+}
+
+
+
+func findCollidingKeys(targetCount int, tableLength uint64) []string {
+	buckets := make(map[uint64][]string)
+	maxCandidates := 2_000_000
+	for i := 0; i < maxCandidates; i++ {
+		key := fmt.Sprintf("probe-key-%d", i)
+		idx := NewKey(key).hash % tableLength
+		bucket := append(buckets[idx], key)
+		if len(bucket) >= targetCount {
+			return bucket
+		}
+		buckets[idx] = bucket
+	}
+
+	panic("could not find enough colliding keys for probing benchmark")
+}
+
 func TestNodeKeyMaxCharactersExceeded(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
@@ -165,72 +207,97 @@ func TestProbingWhenInserting(t *testing.T) {
 }
 
 func BenchmarkSearchExistingKey(b *testing.B) {
-	var length uint64 = 2000000
-	key := "foo-3300"
-	totalItems := 1000000
-	hashTable := New[int](length)
-	for i := 0; i < totalItems; i++ {
-		guid := guid.New()
-		hashTable.Insert(guid.String(), i)
-	}
+	totalItems := 1_000_000
+	keys := makeSequentialKeys(totalItems)
+	targetKey := keys[totalItems/2]
+	table := buildHashTable(keys, 2_000_000)
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		value, err := hashTable.Search(key)
-		if err == nil || value != 0 {
-			b.Errorf(`Search(%s) expected not found, got value=%v error=%v`, key, value, err)
+		value, err := table.Search(targetKey)
+		if err != nil || value != totalItems/2 {
+			b.Fatalf(`Search(%s) expected %d, got value=%v error=%v`, targetKey, totalItems/2, value, err)
 		}
 	}
 }
 
-func BenchmarkNonExistingKey(b *testing.B) {
-	var length uint64 = 2000000
-	key := "foo-%300"
-	totalItems := 1000000
-	hashTable := New[int](length)
-	for i := 0; i < totalItems; i++ {
-		guid := guid.New()
-		hashTable.Insert(guid.String(), i)
-	}
+func BenchmarkSearchNonExistingKey(b *testing.B) {
+	totalItems := 1_000_000
+	keys := makeSequentialKeys(totalItems)
+	table := buildHashTable(keys, 2_000_000)
+	missingKey := "key-missing"
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		value, err := hashTable.Search(key)
+		value, err := table.Search(missingKey)
 		if err == nil || value != 0 {
-			b.Errorf(`Search(%s) expected not found, got value=%v error=%v`, key, value, err)
+			b.Fatalf(`Search(%s) expected not found, got value=%v error=%v`, missingKey, value, err)
 		}
 	}
 }
-
 
 func BenchmarkGoMapSearchExistingKey(b *testing.B) {
-	key := "foo-3300"
-	totalItems := 1000000
-	m := make(map[string]int, totalItems*2)
-	for i := 0; i < totalItems; i++ {
-		g := guid.New()
-		m[g.String()] = i
-	}
+	totalItems := 1_000_000
+	keys := makeSequentialKeys(totalItems)
+	targetKey := keys[totalItems/2]
+	m := buildGoMap(keys, totalItems*2)
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, ok := m[key]
-		if ok {
-			b.Errorf("expected key %s to be missing", key)
+		value, ok := m[targetKey]
+		if !ok || value != totalItems/2 {
+			b.Fatalf("expected key %s to exist with value %d, got value=%d exists=%v", targetKey, totalItems/2, value, ok)
 		}
 	}
 }
 
-func BenchmarkGoMapNonExistingKey(b *testing.B) {
-	key := "foo-%300"
-	totalItems := 1000000
-	m := make(map[string]int, totalItems*2)
-	for i := 0; i < totalItems; i++ {
-		g := guid.New()
-		m[g.String()] = i
-	}
+func BenchmarkGoMapSearchNonExistingKey(b *testing.B) {
+	totalItems := 1_000_000
+	keys := makeSequentialKeys(totalItems)
+	m := buildGoMap(keys, totalItems*2)
+	missingKey := "key-missing"
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, ok := m[key]
+		_, ok := m[missingKey]
 		if ok {
-			b.Errorf("expected key %s to be missing", key)
+			b.Fatalf("expected key %s to be missing", missingKey)
+		}
+	}
+}
+
+func BenchmarkDeleteExistingKey(b *testing.B) {
+	totalItems := 200_000
+	keys := makeSequentialKeys(totalItems)
+	targetIndex := totalItems / 2
+	targetKey := keys[targetIndex]
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		table := buildHashTable(keys, 400_000)
+		b.StartTimer()
+		err := table.Delete(targetKey)
+		if err != nil {
+			b.Fatalf("Delete(%s) expected nil error, got %v", targetKey, err)
+		}
+	}
+}
+
+func BenchmarkGoMapDeleteExistingKey(b *testing.B) {
+	totalItems := 200_000
+	keys := makeSequentialKeys(totalItems)
+	targetIndex := totalItems / 2
+	targetKey := keys[targetIndex]
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		m := buildGoMap(keys, totalItems*2)
+		b.StartTimer()
+		delete(m, targetKey)
+		if _, ok := m[targetKey]; ok {
+			b.Fatalf("expected key %s to be deleted", targetKey)
 		}
 	}
 }
@@ -252,12 +319,7 @@ func BenchmarkInsertNoResize(b *testing.B) {
 	// // without isSoftDeleted in the data struct and computing fnv hash only once by using nodeKey
 	// BenchmarkInsertNoResize-12           100         258080503 ns/op        10718210 B/op    1089742 allocs/op
 	totalKeys := 1_000_000
-	keys := make([]string, totalKeys)
-
-	for i := 0; i < totalKeys; i++ {
-		guid := guid.New()
-		keys[i] = guid.String()
-	}
+	keys := makeSequentialKeys(totalKeys)
 
 	var tableLength uint64 = 2_000_000
 
@@ -273,14 +335,27 @@ func BenchmarkInsertNoResize(b *testing.B) {
 
 }
 
+func BenchmarkInsertWithResize(b *testing.B) {
+	totalKeys := 1_000_000
+	keys := makeSequentialKeys(totalKeys)
+
+	// Starts much smaller to force multiple resize-up operations.
+	var tableLength uint64 = 100_000
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		table := New[int](tableLength)
+		b.StartTimer()
+		for i, key := range keys {
+			table.Insert(key, i)
+		}
+	}
+}
+
 func BenchmarkGoMapInsertNoResize(b *testing.B) {
 	totalKeys := 1_000_000
-	keys := make([]string, totalKeys)
-	for i := 0; i < totalKeys; i++ {
-
-		guid := guid.New()
-		keys[i] = guid.String()
-	}
+	keys := makeSequentialKeys(totalKeys)
 	mapCapacity := 2_000_000
 
 	b.ReportAllocs()
@@ -290,6 +365,52 @@ func BenchmarkGoMapInsertNoResize(b *testing.B) {
 		b.StartTimer()
 		for i, key := range keys {
 			m[key] = i
+		}
+	}
+}
+
+func BenchmarkGoMapInsertWithResize(b *testing.B) {
+	totalKeys := 1_000_000
+	keys := makeSequentialKeys(totalKeys)
+	mapCapacity := 100_000
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		m := make(map[string]int, mapCapacity)
+		b.StartTimer()
+		for i, key := range keys {
+			m[key] = i
+		}
+	}
+}
+
+func BenchmarkProbingHeavyCollisionSearch(b *testing.B) {
+	var tableLength uint64 = 389
+	keys := findCollidingKeys(200, tableLength)
+	table := buildHashTable(keys, tableLength)
+	target := keys[len(keys)-1]
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v, err := table.Search(target)
+		if err != nil || v != len(keys)-1 {
+			b.Fatalf("Search(%s) expected %d, got value=%d error=%v", target, len(keys)-1, v, err)
+		}
+	}
+}
+
+func BenchmarkGoMapProbingHeavyCollisionSearch(b *testing.B) {
+	var tableLength uint64 = 389
+	keys := findCollidingKeys(200, tableLength)
+	m := buildGoMap(keys, len(keys)*2)
+	target := keys[len(keys)-1]
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v, ok := m[target]
+		if !ok || v != len(keys)-1 {
+			b.Fatalf("expected key %s to exist with value %d, got value=%d exists=%v", target, len(keys)-1, v, ok)
 		}
 	}
 }
